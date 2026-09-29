@@ -1,0 +1,2 @@
+# Gstreamer--Multi-Source-Video-Processing-Pipeline-using-GStreamer-FFmpeg-OpenCV-and-MediaMTX
+Multi-Source Video Processing Pipeline using GStreamer, FFmpeg, OpenCV, and MediaMTX. Supports processing multiple video files, combining them into dynamic grid layouts, generating MP4 outputs, and publishing streams via RTSP. Designed for CPU-based video analytics with future support for webcams, RTSP cameras, and real-time streaming.
