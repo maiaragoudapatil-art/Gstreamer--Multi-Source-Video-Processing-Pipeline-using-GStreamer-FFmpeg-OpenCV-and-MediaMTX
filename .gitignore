@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Environment Variables
+.env
+
+# MediaMTX Runtime Files
+mediamtx/*.crt
+mediamtx/*.key
+
+# Outputs
+outputs/
+generated/
+recordings/
+
+# Temporary Files
+temp/
+tmp/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OpenCV / Media Files
+*.avi
+*.mkv
+
+# Optional: Ignore large generated videos
+outputs/*.mp4
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/

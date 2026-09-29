@@ -1,0 +1,1 @@
+$env:Path += ";C:\Users\VijaySegunasi\AppData\Local\Programs\gstreamer\1.0\msvc_x86_64\bin"
