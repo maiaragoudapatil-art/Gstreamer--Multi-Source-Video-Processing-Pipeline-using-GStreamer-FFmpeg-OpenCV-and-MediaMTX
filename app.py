@@ -2,16 +2,34 @@ import cv2
 import numpy as np
 import os
 import math
+import subprocess
 
-# Create output folder
-os.makedirs("outputs", exist_ok=True)
+# ------------------------
+# CONFIG
+# ------------------------
 
-# Get all mp4 videos
-video_folder = "videos"
+VIDEO_FOLDER = "videos"
+OUTPUT_FOLDER = "outputs"
+
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+TEMP_OUTPUT = os.path.join(
+    OUTPUT_FOLDER,
+    "combined_temp.mp4"
+)
+
+FINAL_OUTPUT = os.path.join(
+    OUTPUT_FOLDER,
+    "combined.mp4"
+)
+
+# ------------------------
+# FIND VIDEOS
+# ------------------------
 
 video_files = [
-    os.path.join(video_folder, f)
-    for f in os.listdir(video_folder)
+    os.path.join(VIDEO_FOLDER, f)
+    for f in os.listdir(VIDEO_FOLDER)
     if f.lower().endswith(".mp4")
 ]
 
@@ -21,45 +39,117 @@ if not video_files:
 
 print(f"Found {len(video_files)} videos")
 
-# Open all videos
-caps = [cv2.VideoCapture(v) for v in video_files]
+# ------------------------
+# OPEN VIDEOS
+# ------------------------
 
-# Frame size for each video
+caps = []
+
+for video in video_files:
+
+    cap = cv2.VideoCapture(video)
+
+    if not cap.isOpened():
+        print(f"Failed: {video}")
+        continue
+
+    print(f"Opened: {video}")
+    caps.append(cap)
+
+if not caps:
+    print("No valid videos found!")
+    exit()
+
+# ------------------------
+# GRID SETUP
+# ------------------------
+
 cell_w = 640
 cell_h = 360
 
-# Determine grid size
 num_videos = len(caps)
+
 cols = math.ceil(math.sqrt(num_videos))
 rows = math.ceil(num_videos / cols)
 
 output_width = cols * cell_w
 output_height = rows * cell_h
 
-# Use FPS from first video
 fps = caps[0].get(cv2.CAP_PROP_FPS)
 
 if fps <= 0:
     fps = 25
 
-# Output writer
+print(f"FPS: {fps}")
+
+# ------------------------
+# DELETE OLD FILES
+# ------------------------
+
+for file in [TEMP_OUTPUT, FINAL_OUTPUT]:
+    if os.path.exists(file):
+        os.remove(file)
+
+# ------------------------
+# VIDEO WRITER
+# ------------------------
+
 out = cv2.VideoWriter(
-    "outputs/combined.mp4",
+    TEMP_OUTPUT,
     cv2.VideoWriter_fourcc(*"mp4v"),
     fps,
     (output_width, output_height)
 )
 
+if not out.isOpened():
+    print("Failed to create VideoWriter")
+    exit()
+
 print("Processing started...")
 
-while True:
-    frames = []
+# ------------------------
+# COMBINE VIDEOS
+# ------------------------
 
-    for cap in caps:
+while True:
+
+    frames = []
+    active_frames = 0
+
+    for i, cap in enumerate(caps):
+
         ret, frame = cap.read()
 
-        if not ret:
-            frame = np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+        if ret:
+
+            active_frames += 1
+
+            frame = cv2.resize(
+                frame,
+                (cell_w, cell_h)
+            )
+
+            name = os.path.basename(
+                video_files[i]
+            )
+
+            cv2.putText(
+                frame,
+                name,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 0),
+                2
+            )
+
+        else:
+
+            frame = np.zeros(
+                (cell_h, cell_w, 3),
+                dtype=np.uint8
+            )
+
             cv2.putText(
                 frame,
                 "Video Ended",
@@ -67,56 +157,83 @@ while True:
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1,
                 (0, 0, 255),
-                2,
+                2
             )
-        else:
-            frame = cv2.resize(frame, (cell_w, cell_h))
 
         frames.append(frame)
 
-    # Stop when all videos finished
-    ended_count = 0
-
-    for cap in caps:
-        if cap.get(cv2.CAP_PROP_POS_FRAMES) >= cap.get(
-            cv2.CAP_PROP_FRAME_COUNT
-        ):
-            ended_count += 1
-
-    if ended_count == len(caps):
+    if active_frames == 0:
         break
 
-    # Fill empty slots
     while len(frames) < rows * cols:
+
         frames.append(
-            np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+            np.zeros(
+                (cell_h, cell_w, 3),
+                dtype=np.uint8
+            )
         )
 
-    rows_list = []
+    row_frames = []
 
     for r in range(rows):
+
         start = r * cols
         end = start + cols
 
-        row = np.hstack(frames[start:end])
-        rows_list.append(row)
+        row = np.hstack(
+            frames[start:end]
+        )
 
-    combined = np.vstack(rows_list)
+        row_frames.append(row)
+
+    combined = np.vstack(row_frames)
 
     out.write(combined)
 
-    cv2.imshow("Combined Video", combined)
+    cv2.imshow(
+        "Combined Video",
+        combined
+    )
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-# Cleanup
+# ------------------------
+# CLEANUP
+# -----------------------
+
 for cap in caps:
     cap.release()
 
 out.release()
-
 cv2.destroyAllWindows()
 
+print("Combination complete.")
+print("Converting to H264...")
+
+# ------------------------
+# MP4V -> H264
+# ------------------------
+
+ffmpeg_cmd = [
+    "ffmpeg",
+    "-y",
+    "-i",
+    TEMP_OUTPUT,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-pix_fmt",
+    "yuv420p",
+    FINAL_OUTPUT
+]
+
+subprocess.run(ffmpeg_cmd)
+
+print()
 print("Done!")
-print("Saved to outputs/combined.mp4")
+print(f"H264 Output: {FINAL_OUTPUT}")
